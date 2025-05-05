@@ -65,6 +65,16 @@ func NewRouter() *gin.Engine {
 			// authed.POST("timing_task/search", api.SearchTimingTask)
 			// authed.DELETE("timing_task/:id", api.DeleteTimingTask)
 
+			// 亲属关系
+			authed.POST("/relative_info", api.CreateRelative)
+			authed.PUT("/relative_info/:id", api.UpdateRelative)
+			authed.GET("/relative_info", api.GetAllRelatives)
+			authed.DELETE("/relative_info", api.DeleteRelative)
+
+			// 账单导入GET
+			authed.POST("/import-bill", api.ImportBill)
+			authed.GET("/bills", api.GetBillList)
+
 			// sse消息推送
 			authed.GET("/push/notifications", middleware.SSEAuth(), sse.SSEHandler())
 

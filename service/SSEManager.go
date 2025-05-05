@@ -27,7 +27,4 @@ func sendNotification(task model.TimingTask) {
 
 	// 将事件发送到通知通道
 	NotificationChan <- event
-
-	// 打印日志（可选）
-	// log("任务提醒已发送: TaskID=%d, Title=%s", task.ID, task.Title)
 }

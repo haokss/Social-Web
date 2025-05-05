@@ -4,6 +4,7 @@ import (
 	"strings"
 	"todo_list/model"
 
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/ini.v1"
 )
 
@@ -26,7 +27,7 @@ var (
 func Init() {
 	file, err := ini.Load("./config/config.ini")
 	if err != nil {
-		println("配置文件加载失败")
+		log.Error("Load Config Error!")
 	}
 	LoadServer(file)
 	LoadMysql(file)

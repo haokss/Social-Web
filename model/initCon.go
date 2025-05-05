@@ -1,11 +1,10 @@
 package model
 
 import (
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	log "github.com/sirupsen/logrus"
 )
 
 var DB *gorm.DB
@@ -15,7 +14,8 @@ func DataBase(conn_string string) {
 	if err != nil {
 		panic("Mysql连接错误")
 	}
-	fmt.Println("Mysql数据库连接成功！")
+
+	log.Info("Mysql DataBase Connect Success!")
 	db.LogMode(true)
 	if gin.Mode() == "release" {
 		db.LogMode(false)
