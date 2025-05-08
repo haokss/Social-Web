@@ -59,3 +59,15 @@ func BatchDeleteFriends(c *gin.Context) {
 		c.JSON(400, serializer.Response{Status: 400, Msg: "参数错误"})
 	}
 }
+
+func GetUnsetMapFriends(c *gin.Context) {
+	var listFriend service.ListFriendService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+	if err := c.ShouldBind(&listFriend); err == nil {
+		res := listFriend.GetUnsetMapFriends(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}

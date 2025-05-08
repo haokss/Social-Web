@@ -1,7 +1,9 @@
 package service
 
 import (
+	"todo_list/cache"
 	"todo_list/model"
+	"todo_list/package/utils"
 	"todo_list/serializer"
 )
 
@@ -47,6 +49,8 @@ func (service *CreateColleagueService) Create(uid uint) serializer.Response {
 			Msg:    "创建失败",
 		}
 	}
+	// 写入缓存
+	cache.UpdateColleagueCache(colleague)
 	return serializer.Response{
 		Status: 200,
 		Msg:    "创建成功",
@@ -54,43 +58,48 @@ func (service *CreateColleagueService) Create(uid uint) serializer.Response {
 }
 
 func (service *ListColleagueService) List(uid uint) serializer.Response {
-	var colleagues []model.Colleague
-	var total int64
+	var result []model.Colleague
 
+	// 从缓存读取所有同事
+	cache.ColleagueCacheLock.RLock()
+	for _, c := range cache.ColleagueCache {
+		if c.Uid != uid {
+			continue
+		}
+		if service.Name != "" && !utils.ContainsIgnoreCase(c.Name, service.Name) {
+			continue
+		}
+		if service.Company != "" && !utils.ContainsIgnoreCase(c.Company, service.Company) {
+			continue
+		}
+		result = append(result, c)
+	}
+	cache.ColleagueCacheLock.RUnlock()
+
+	total := len(result)
+
+	// 分页处理
 	if service.Page <= 0 {
 		service.Page = 1
 	}
 	if service.PageSize <= 0 {
 		service.PageSize = 10
 	}
-
-	tx := model.DB.Model(&model.Colleague{}).Where("uid = ?", uid)
-	if service.Name != "" {
-		tx = tx.Where("name LIKE ?", "%"+service.Name+"%")
+	start := (service.Page - 1) * service.PageSize
+	end := start + service.PageSize
+	if start > total {
+		start = total
 	}
-	if service.Company != "" {
-		tx = tx.Where("company LIKE ?", "%"+service.Company+"%")
+	if end > total {
+		end = total
 	}
-
-	tx.Count(&total)
-
-	err := tx.Order("created_at desc").
-		Offset((service.Page - 1) * service.PageSize).
-		Limit(service.PageSize).
-		Find(&colleagues).Error
-
-	if err != nil {
-		return serializer.Response{
-			Status: 500,
-			Msg:    "获取同事列表失败",
-		}
-	}
+	pagedResult := result[start:end]
 
 	return serializer.Response{
 		Status: 200,
-		Msg:    "获取同事列表成功",
+		Msg:    "获取同事列表成功（缓存）",
 		Data: map[string]interface{}{
-			"list":      colleagues,
+			"list":      pagedResult,
 			"total":     total,
 			"page":      service.Page,
 			"page_size": service.PageSize,
@@ -119,6 +128,10 @@ func (service *UpdateColleagueService) Update(idStr string) serializer.Response 
 			Msg:    "更新失败",
 		}
 	}
+
+	// 更新缓存
+	cache.UpdateColleagueCache(colleague)
+
 	return serializer.Response{
 		Status: 200,
 		Msg:    "更新成功",
@@ -140,8 +153,53 @@ func (service *BatchDeleteColleagueService) BatchDelete() serializer.Response {
 		}
 	}
 
+	// 删除缓存
+	cache.DeleteColleagueCache(service.IDs)
+
 	return serializer.Response{
 		Status: 200,
 		Msg:    "批量删除成功",
+	}
+}
+
+func (service *ListColleagueService) GetUnsetMapColleagues(id uint) serializer.Response {
+	var colleagues []model.Colleague
+
+	// 先从缓存中筛选
+	cache.ColleagueCacheLock.RLock()
+	if len(cache.ColleagueCache) > 0 {
+		for _, colleague := range cache.ColleagueCache {
+			if colleague.IsSetMap == 0 { // 筛选未设置点位的同事
+				colleagues = append(colleagues, colleague)
+			}
+		}
+		cache.ColleagueCacheLock.RUnlock()
+	} else {
+		// 缓存为空，从数据库查
+		cache.ColleagueCacheLock.RUnlock()
+		if err := model.DB.Where("is_set_map = ?", 0).Find(&colleagues).Error; err != nil {
+			return serializer.Response{
+				Status: 500,
+				Msg:    "获取未设置地图同事信息失败: " + err.Error(),
+			}
+		}
+
+		// 同时把查到的所有（含 is_set_map=0 和 ≠0）加载进缓存
+		var allColleagues []model.Colleague
+		if err := model.DB.Find(&allColleagues).Error; err == nil {
+			cache.ColleagueCacheLock.Lock()
+			for _, c := range allColleagues {
+				cache.ColleagueCache[c.ID] = c
+			}
+			cache.ColleagueCacheLock.Unlock()
+		}
+	}
+
+	simpleColleagues := serializer.BuildColleaguesMapView(colleagues)
+
+	return serializer.Response{
+		Status: 200,
+		Data:   simpleColleagues,
+		Msg:    "获取成功",
 	}
 }

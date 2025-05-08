@@ -5,6 +5,7 @@ import (
 )
 
 type Bill struct {
+	Uid             uint    `json:"uid"`
 	TransactionTime string  `gorm:"size:100"`
 	TransactionType string  `gorm:"size:50;not null"`
 	Counterparty    string  `gorm:"size:100"` // 允许为空

@@ -70,3 +70,15 @@ func BatchDeleteClassmate(c *gin.Context) {
 		})
 	}
 }
+
+func GetUnsetMapClassmates(c *gin.Context) {
+	var listClassmate service.ListClassmateService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+	if err := c.ShouldBind(&listClassmate); err == nil {
+		res := listClassmate.GetUnsetMapClassmates(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}

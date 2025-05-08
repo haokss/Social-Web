@@ -26,6 +26,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to init cache: %v", err)
 	}
+	if err := cache.InitRelativeCache(); err != nil {
+		log.Fatalf("Failed to init cache: %v", err)
+	}
+	if err := cache.InitColleagueCache(); err != nil {
+		log.Fatalf("Failed to init cache: %v", err)
+	}
+	if err := cache.InitFriendCache(); err != nil {
+		log.Fatalf("Failed to init cache: %v", err)
+	}
+	if err := cache.InitClassmateCache(); err != nil {
+		log.Fatalf("Failed to init cache: %v", err)
+	}
+	cache.InitBillCache()
 	// 初始化路由
 	r := routes.NewRouter()
 

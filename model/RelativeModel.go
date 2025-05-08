@@ -14,6 +14,8 @@ type RelativeInfo struct {
 	DebtProof       string         `gorm:"type:text" json:"debtProof"`
 	Note            string         `gorm:"type:text" json:"note"`
 	Avatar          string         `gorm:"type:text" json:"avatar"`
-	ParentID        *uint          `json:"parentId"` // Nullable for root
+	ParentID        *uint          `json:"parentId"`                      // Nullable for root
+	IsSetMap        uint           `gorm:"default:'0'" json:"is_set_map"` // 是否设置地图点位 0未设置 1设置
+	MapUid          uint           `gorm:"default:'-1'" json:"map_uid"`   // 地图点位ID
 	Children        []RelativeInfo `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 }

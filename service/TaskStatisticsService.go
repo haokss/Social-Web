@@ -14,9 +14,9 @@ type TrendService struct{}
 
 type TypeDistributionService struct{}
 
-type UpcomingService struct{}
+type ShowUpcomingTasksService struct{}
 
-type HighPriorityService struct{}
+type ShowHighPriorityTasksService struct{}
 
 // /stats: 统计 Status 数量和时间范围
 func (s *StatisticsService) Stats(uid uint) serializer.Response {
@@ -193,4 +193,43 @@ func (s *StatisticsService) TypeDistribution(uid uint) serializer.Response {
 	}
 
 	return serializer.Response{Status: 200, Data: data}
+}
+
+func (service *ShowUpcomingTasksService) ShowUpcoming(uid uint) serializer.Response {
+	now := time.Now().Unix()
+	tomorrow := now + 24*60*60
+
+	// 直接从内存缓存获取
+	allTasks := cache.GetUserTasks(uid)
+
+	var upcomingTasks []serializer.Task
+	for _, task := range allTasks {
+		if task.Status == 0 && task.EndTime >= now && task.EndTime <= tomorrow {
+			upcomingTasks = append(upcomingTasks, serializer.BuildTask(task))
+		}
+	}
+
+	return serializer.Response{
+		Status: 200,
+		Data:   upcomingTasks,
+		Msg:    "查询成功",
+	}
+}
+
+func (service *ShowHighPriorityTasksService) ShowHighPriority(uid uint) serializer.Response {
+	// 从缓存获取当前用户的所有任务
+	allTasks := cache.GetUserTasks(uid)
+
+	var highPriorityTasks []serializer.Task
+	for _, task := range allTasks {
+		if task.Priority >= 4 { // 这里设定4~5为高优先级
+			highPriorityTasks = append(highPriorityTasks, serializer.BuildTask(task))
+		}
+	}
+
+	return serializer.Response{
+		Status: 200,
+		Data:   highPriorityTasks,
+		Msg:    "查询成功",
+	}
 }

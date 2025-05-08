@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"todo_list/cache"
 	"todo_list/model"
 	"todo_list/package/report"
 	"todo_list/serializer"
@@ -91,6 +92,10 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 		}
 	}
 
+	var userBills []model.Bill
+	model.DB.Where("created_by = ?", id).Find(&userBills)
+	cache.SetUserBills(id, userBills)
+
 	return serializer.Response{
 		Status: 200,
 		Msg:    fmt.Sprintf("成功导入 %d/%d 条记录", successCount, len(bills)),
@@ -98,6 +103,36 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 }
 
 func (service *ListBillService) GetBillList(id uint) serializer.Response {
+	// // 先查缓存
+	// bills := cache.GetUserBills(id)
+	// if len(bills) > 0 {
+	// 	return serializer.Response{
+	// 		Status: 200,
+	// 		Msg:    "获取成功（缓存）",
+	// 		Data: map[string]interface{}{
+	// 			"list":  bills,
+	// 			"total": len(bills),
+	// 		},
+	// 	}
+	// }
+
+	// // 缓存未命中，查数据库
+	// var dbBills []model.Bill
+	// if err := model.DB.Where("created_by = ?", id).Find(&dbBills).Error; err != nil {
+	// 	return serializer.Response{Status: 500, Msg: "获取账单失败: " + err.Error()}
+	// }
+
+	// // 存入缓存
+	// cache.SetUserBills(id, dbBills)
+
+	// return serializer.Response{
+	// 	Status: 200,
+	// 	Msg:    "获取成功",
+	// 	Data: map[string]interface{}{
+	// 		"list":  dbBills,
+	// 		"total": len(dbBills),
+	// 	},
+	// }
 	var bills []model.Bill
 	var total int64
 

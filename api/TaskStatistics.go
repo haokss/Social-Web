@@ -39,3 +39,29 @@ func GetTaskTypeDistribution(c *gin.Context) {
 	res := service.TypeDistribution(claim.Id)
 	c.JSON(200, res)
 }
+
+func ShowUpcomingTasks(c *gin.Context) {
+	var service service.ShowUpcomingTasksService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+
+	if err := c.ShouldBind(&service); err == nil {
+		res := service.ShowUpcoming(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}
+
+func ShowHighPriorityTasks(c *gin.Context) {
+	var service service.ShowHighPriorityTasksService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+
+	if err := c.ShouldBind(&service); err == nil {
+		res := service.ShowHighPriority(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}

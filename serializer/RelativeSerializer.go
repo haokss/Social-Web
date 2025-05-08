@@ -79,3 +79,16 @@ func BuildRelativeTree(relatives []model.RelativeInfo) []Relative {
 
 	return []Relative{*rootNode}
 }
+
+func BuildRelativesMapView(relatives []model.RelativeInfo) []map[string]interface{} {
+	var result []map[string]interface{}
+	for _, r := range relatives {
+		result = append(result, map[string]interface{}{
+			"id":         r.ID,
+			"name":       r.Name,
+			"relation":   r.Relation,
+			"is_set_map": r.IsSetMap,
+		})
+	}
+	return result
+}

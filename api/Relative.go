@@ -59,3 +59,16 @@ func DeleteRelative(c *gin.Context) {
 		c.JSON(400, err)
 	}
 }
+
+// 未设置亲属关系
+func GetUnsetMapRelatives(c *gin.Context) {
+	var listRelative service.ListRelativeService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+	if err := c.ShouldBind(&listRelative); err == nil {
+		res := listRelative.GetUnsetMapRelatives(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}

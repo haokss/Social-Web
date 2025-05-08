@@ -70,6 +70,8 @@ func NewRouter() *gin.Engine {
 			authed.GET("tasks/stats", api.GetTaskStats)
 			authed.GET("tasks/trend", api.GetTaskTrend)
 			authed.GET("tasks/type-distribution", api.GetTaskTypeDistribution)
+			authed.GET("tasks/upcoming", api.ShowUpcomingTasks)
+			authed.GET("/tasks/high-priority", api.ShowHighPriorityTasks)
 
 			// 亲属关系
 			authed.POST("/relative_info", api.CreateRelative)
@@ -94,6 +96,17 @@ func NewRouter() *gin.Engine {
 			authed.PUT("/classmate/:id", api.UpdateClassmate)
 			// authed.DELETE("/friends/:id", api.BatchDeleteClassmate) // 单个删除你已有
 			authed.DELETE("/classmate/batch_delete", api.BatchDeleteClassmate)
+
+			// 关系地图
+			authed.GET("/relative/unset_map_relative", api.GetUnsetMapRelatives)
+			authed.GET("/relative/unset_map_colleague", api.GetUnsetMapColleagues)
+			authed.GET("/relative/unset_map_friend", api.GetUnsetMapFriends)
+			authed.GET("/relative/unset_map_classmate", api.GetUnsetMapClassmates)
+
+			authed.POST("/relative/point", api.CreatePoint)
+			authed.GET("/relative/point", api.ListPoints)
+			authed.PUT("/relative/point", api.UpdatePoint)
+			authed.DELETE("/relative/point/:id", api.DeletePoint)
 
 			// 账单导入GET
 			authed.POST("/import-bill", api.ImportBill)

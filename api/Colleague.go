@@ -67,3 +67,15 @@ func BatchDeleteColleagues(c *gin.Context) {
 		})
 	}
 }
+
+func GetUnsetMapColleagues(c *gin.Context) {
+	var listColleague service.ListColleagueService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+	if err := c.ShouldBind(&listColleague); err == nil {
+		res := listColleague.GetUnsetMapColleagues(claim.Id)
+		c.JSON(200, res)
+	} else {
+		logging.Error(err)
+		c.JSON(400, err)
+	}
+}

@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"todo_list/cache"
 	"todo_list/model"
 	"todo_list/serializer"
 )
@@ -68,6 +69,9 @@ func (service *CreateRelativeService) CreateRelative(id uint) serializer.Respons
 		}
 	}
 
+	// 更新缓存
+	cache.UpdateRelative(node)
+
 	return serializer.Response{
 		Status: 200,
 		Data:   serializer.BuildRelative(node),
@@ -78,11 +82,30 @@ func (service *CreateRelativeService) CreateRelative(id uint) serializer.Respons
 // 获取所有亲属信息
 func (service *ListRelativeService) GetRelativeList(id uint) serializer.Response {
 	var relatives []model.RelativeInfo
-	if err := model.DB.Find(&relatives).Error; err != nil {
-		return serializer.Response{
-			Status: 500,
-			Msg:    "获取亲属信息失败: " + err.Error(),
+
+	// 从缓存中获取所有亲属信息
+	cache.RelativeCacheLock.RLock()
+	if len(cache.RelativeCache) > 0 {
+		for _, relative := range cache.RelativeCache {
+			relatives = append(relatives, relative)
 		}
+		cache.RelativeCacheLock.RUnlock()
+	} else {
+		// 如果缓存为空，则从数据库查询
+		cache.RelativeCacheLock.RUnlock()
+		if err := model.DB.Find(&relatives).Error; err != nil {
+			return serializer.Response{
+				Status: 500,
+				Msg:    "获取亲属信息失败: " + err.Error(),
+			}
+		}
+
+		// 将数据加载到缓存
+		cache.RelativeCacheLock.Lock()
+		for _, relative := range relatives {
+			cache.RelativeCache[relative.ID] = relative
+		}
+		cache.RelativeCacheLock.Unlock()
 	}
 
 	tree := serializer.BuildRelativeTree(relatives)
@@ -124,6 +147,9 @@ func (service *UpdateRelativeService) Update(id uint, tid string) serializer.Res
 			Msg:    "更新失败: " + err.Error(),
 		}
 	}
+
+	// 更新缓存
+	cache.UpdateRelative(relative)
 
 	return serializer.Response{
 		Status: 200,
@@ -177,11 +203,59 @@ func (service *DeleteRelativeService) DeleteRelative() serializer.Response {
 		}
 	}
 
+	// 删除缓存中的亲属信息
+	for _, id := range allIDs {
+		cache.DeleteRelative(id)
+	}
+
 	return serializer.Response{
 		Status: 200,
 		Msg:    "删除成功",
 		Data: map[string]interface{}{
 			"deleted_ids": allIDs,
 		},
+	}
+}
+
+// 获取未设置地图点位的亲属
+func (service *ListRelativeService) GetUnsetMapRelatives(id uint) serializer.Response {
+	var relatives []model.RelativeInfo
+
+	// 先从缓存中筛选
+	cache.RelativeCacheLock.RLock()
+	if len(cache.RelativeCache) > 0 {
+		for _, relative := range cache.RelativeCache {
+			if relative.IsSetMap == 0 {
+				relatives = append(relatives, relative)
+			}
+		}
+		cache.RelativeCacheLock.RUnlock()
+	} else {
+		// 缓存为空，从数据库查
+		cache.RelativeCacheLock.RUnlock()
+		if err := model.DB.Where("is_set_map = ?", 0).Find(&relatives).Error; err != nil {
+			return serializer.Response{
+				Status: 500,
+				Msg:    "获取未设置地图亲属信息失败: " + err.Error(),
+			}
+		}
+
+		// 同时把查到的所有（含 is_set_map=0 和 ≠0）加载进缓存
+		var allRelatives []model.RelativeInfo
+		if err := model.DB.Find(&allRelatives).Error; err == nil {
+			cache.RelativeCacheLock.Lock()
+			for _, r := range allRelatives {
+				cache.RelativeCache[r.ID] = r
+			}
+			cache.RelativeCacheLock.Unlock()
+		}
+	}
+
+	simpleRelatives := serializer.BuildRelativesMapView(relatives)
+
+	return serializer.Response{
+		Status: 200,
+		Data:   simpleRelatives,
+		Msg:    "获取成功",
 	}
 }
