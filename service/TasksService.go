@@ -1,21 +1,32 @@
 package service
 
 import (
-	"time"
+	"todo_list/cache"
 	"todo_list/model"
+	"todo_list/package/utils"
 	"todo_list/serializer"
 )
 
 type CreateTaskService struct {
-	Title   string `json:"title" form:"title"`
-	Content string `json:"content" form:"content"`
-	Status  int    `json:"code" form:"code"` // 0未作，1已完成
+	Title     string `json:"title" form:"title"`
+	Content   string `json:"content" form:"content"`
+	Status    int    `json:"code" form:"code"` // 0未作，1已完成
+	Priority  int    `json:"priority" form:"priority"`
+	IsNotify  int    `json:"IsNotify" form:"IsNotify"`
+	NotifyWay int    `json:"NotifyWay" form:"NotifyWay"`
+	StartTime int64  `json:"start_time" form:"start_time"`
+	EndTime   int64  `json:"end_time" form:"end_time"`
 }
 
 type UpdateTaskService struct {
-	Title   string `json:"title" form:"title"`
-	Content string `json:"content" form:"content"`
-	Status  int    `json:"code" form:"code"` // 0未作，1已完成
+	Title     string `json:"title" form:"title"`
+	Content   string `json:"content" form:"content"`
+	Status    int    `json:"code" form:"code"` // 0未作，1已完成
+	Priority  int    `json:"priority" form:"priority"`
+	IsNotify  int    `json:"IsNotify" form:"IsNotify"`
+	NotifyWay int    `json:"NotifyWay" form:"NotifyWay"`
+	StartTime int64  `json:"start_time" form:"start_time"`
+	EndTime   int64  `json:"end_time" form:"end_time"`
 }
 
 type SearchTaskService struct {
@@ -35,126 +46,83 @@ type ShowTaskAllService struct {
 	PageSize int `json:"page_size" from:"page_size"`
 }
 
-// 创建一条备忘录
+// 创建一条活动
 func (service *CreateTaskService) Create(id uint) serializer.Response {
 	var user model.User
 	model.DB.First(&user, id)
-	code := 200
 	task := model.Task{
 		User:      user,
 		Uid:       user.ID,
 		Title:     service.Title,
 		Status:    0,
 		Content:   service.Content,
-		StartTime: time.Now().Unix(),
-		EndTime:   0,
+		Priority:  service.Priority,
+		StartTime: service.StartTime,
+		EndTime:   service.EndTime,
+		IsNotify:  service.IsNotify,
+		NotifyWay: service.NotifyWay,
 	}
-	err := model.DB.Create(&task).Error
-	if err != nil {
-		code = 500
-		return serializer.Response{
-			Status: code,
-			Msg:    "create failed!",
-		}
+	if err := model.DB.Create(&task).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "create failed!"}
 	}
-	return serializer.Response{
-		Status: code,
-		Msg:    "create success!",
-	}
+	cache.SetTask(task)
+	return serializer.Response{Status: 200, Msg: "create success!"}
 }
 
-// 展示一条备忘录
+// 展示一条活动
 func (service *ShowTaskService) Show(uid uint, tid string) serializer.Response {
-	var task model.Task
-	code := 200
-	err := model.DB.First(&task, tid).Error
-	if err != nil {
-		code = 500
-		return serializer.Response{
-			Status: code,
-			Msg:    "search error!",
-		}
+	taskID := utils.ParseID(tid)
+	if task, ok := cache.GetTask(taskID); ok && task.Uid == uid {
+		return serializer.Response{Status: 200, Data: serializer.BuildTask(task), Msg: "search success!"}
 	}
-	return serializer.Response{
-		Status: code,
-		Data:   serializer.BuildTask(task),
-		Msg:    "search success!",
-	}
+	return serializer.Response{Status: 404, Msg: "task not found!"}
 }
 
-// 返回所有的备忘录
+// 返回所有的活动
 func (service *ShowTaskAllService) ShowAll(uid uint) serializer.Response {
-	var tasks []model.Task
-	// 传入的pagesize为0，代表一次获取所有
-	count := 0
-	if service.PageNum == 0 {
-		service.PageSize = 10
-	}
-	model.DB.Model(&model.Task{}).
-		Preload("User").Where("uid=?", uid).
-		Count(&count).
-		Limit(service.PageSize).
-		Offset((service.PageNum - 1) * service.PageSize).
-		Find(&tasks)
-
+	tasks := cache.GetUserTasks(uid)
+	count := len(tasks)
 	return serializer.BuildListResponse(serializer.BuildTasks(tasks), uint(count))
 }
 
-// 更新一条备忘录
+// 更新一条活动
 func (service *UpdateTaskService) Update(uid uint, tid string) serializer.Response {
+	taskID := utils.ParseID(tid)
 	var task model.Task
-	code := 200
-	err := model.DB.First(&task, tid).Error
-	if err != nil {
-		code = 500
-		return serializer.Response{
-			Status: code,
-			Msg:    "search error!",
-		}
+	if err := model.DB.First(&task, taskID).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "search error!"}
 	}
-	task.Content = service.Content
 	task.Title = service.Title
+	task.Content = service.Content
 	task.Status = service.Status
+	task.Priority = service.Priority
+	task.StartTime = service.StartTime
+	task.EndTime = service.EndTime
+	task.IsNotify = service.IsNotify
+	task.NotifyWay = service.NotifyWay
 	model.DB.Save(&task)
-	return serializer.Response{
-		Status: code,
-		Data:   serializer.BuildTask(task),
-		Msg:    "update success!",
-	}
+	cache.SetTask(task)
+	return serializer.Response{Status: 200, Data: serializer.BuildTask(task), Msg: "update success!"}
 }
 
 // 模糊查询
 func (service *SearchTaskService) Search(uid uint) serializer.Response {
-	var tasks []model.Task
-	count := 0
-
-	model.DB.Model(&model.Task{}).
-		Preload("User").
-		Where("title LIKE ? OR content LIKE ?", "%"+service.SearchInfo+"%", "%"+service.SearchInfo+"%").
-		Count(&count).
-		Limit(service.PageSize).
-		Offset((service.PageNum - 1) * service.PageSize).
-		Find(&tasks)
-
-	return serializer.Response{
-		Status: 200,
-		Data:   serializer.BuildTasks(tasks),
-	}
-}
-
-// 删除
-func (service *DeleteTaskService) Delete(tid string) serializer.Response {
-	var task model.Task
-	model.DB.First(&task, tid)
-	err := model.DB.Delete(&task).Error
-	if err != nil {
-		return serializer.Response{
-			Status: 500,
-			Msg:    "Delete Task Failed!",
+	tasks := cache.GetUserTasks(uid)
+	var result []model.Task
+	for _, t := range tasks {
+		if utils.Contains(t.Title, service.SearchInfo) || utils.Contains(t.Content, service.SearchInfo) {
+			result = append(result, t)
 		}
 	}
-	return serializer.Response{
-		Status: 200,
-		Msg:    "Delete Task Success!",
+	return serializer.Response{Status: 200, Data: serializer.BuildTasks(result)}
+}
+
+// 删除活动
+func (service *DeleteTaskService) Delete(tid string) serializer.Response {
+	taskID := utils.ParseID(tid)
+	if err := model.DB.Unscoped().Delete(&model.Task{}, taskID).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "Delete Task Failed!"}
 	}
+	cache.DeleteTask(taskID)
+	return serializer.Response{Status: 200, Msg: "Delete Task Success!"}
 }

@@ -2,8 +2,12 @@ package service
 
 import (
 	"time"
+	"todo_list/cache"
 	"todo_list/model"
+	sse "todo_list/package/SSE"
 	"todo_list/serializer"
+
+	"github.com/gin-gonic/gin"
 )
 
 type CreateTimingTaskService struct {
@@ -32,7 +36,8 @@ type SearchTimingTaskService struct {
 type ShowTimingTaskService struct {
 }
 
-type DeleteTimingTaskService struct {
+type DeleteTimingTasksService struct {
+	IDs []uint `json:"ids" form:"ids"` // 任务ID数组
 }
 
 type ShowTimingTaskAllService struct {
@@ -48,11 +53,10 @@ const (
 	TaskStatusExpired   = 3 // 已过期
 )
 
-// 创建一条备忘录
-func (service *CreateTimingTaskService) Create(id uint) serializer.Response {
+// 创建一条定时任务
+func (service *CreateTimingTaskService) Create(c *gin.Context, id uint) serializer.Response {
 	var user model.User
 	model.DB.First(&user, id)
-	code := 200
 	task := model.TimingTask{
 		User:      user,
 		Uid:       user.ID,
@@ -66,18 +70,22 @@ func (service *CreateTimingTaskService) Create(id uint) serializer.Response {
 		StartTime: service.StartTime,
 		EndTime:   service.EndTime,
 	}
-	err := model.DB.Create(&task).Error
-	if err != nil {
-		code = 500
-		return serializer.Response{
-			Status: code,
-			Msg:    "create failed!",
-		}
+	if err := model.DB.Create(&task).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "create failed!"}
 	}
-	return serializer.Response{
-		Status: code,
-		Msg:    "create success!",
-	}
+	cache.SetTimingTask(task) // 加入缓存
+
+	// 创建定时任务通知
+	// 计算提醒时间
+	notifyTime := service.StartTime.Add(-time.Duration(service.EarlyTime) * time.Minute)
+	broker := c.MustGet("sseBroker").(*sse.Broker)
+	broker.ScheduleNotify(sse.Message{
+		Event:     "new_year_notification",
+		Data:      map[string]interface{}{"title": service.Title, "content": service.Content},
+		TargetIDs: []uint{user.ID},
+	}, notifyTime)
+
+	return serializer.Response{Status: 200, Msg: "create success!"}
 }
 
 // // 展示一条定时任务
@@ -102,7 +110,6 @@ func (service *CreateTimingTaskService) Create(id uint) serializer.Response {
 // 返回所有定时任务
 func (service *ShowTimingTaskAllService) ShowAll(uid uint) serializer.Response {
 	var tasks []model.TimingTask
-	// 传入的pagesize为0，代表一次获取所有
 	count := 0
 	if service.PageNum == 0 {
 		service.PageSize = 10
@@ -115,6 +122,11 @@ func (service *ShowTimingTaskAllService) ShowAll(uid uint) serializer.Response {
 		Offset((service.PageNum - 1) * service.PageSize).
 		Find(&tasks)
 
+	// 更新缓存
+	for _, task := range tasks {
+		cache.SetTimingTask(task)
+	}
+
 	return serializer.Response{
 		Status: 200,
 		Data: serializer.DataList{
@@ -125,28 +137,27 @@ func (service *ShowTimingTaskAllService) ShowAll(uid uint) serializer.Response {
 	}
 }
 
-// // 更新一条备忘录
-// func (service *UpdateTimingTaskService) Update(uid uint, tid string) serializer.Response {
-// 	// var task model.TimingTask
-// 	// code := 200
-// 	// err := model.DB.First(&task, tid).Error
-// 	// if err != nil {
-// 	// 	code = 500
-// 	// 	return serializer.Response{
-// 	// 		Status: code,
-// 	// 		Msg:    "search error!",
-// 	// 	}
-// 	// }
-// 	// task.Content = service.Content
-// 	// task.Title = service.Title
-// 	// task.Status = service.Status
-// 	// model.DB.Save(&task)
-// 	// return serializer.Response{
-// 	// 	Status: code,
-// 	// 	Data:   serializer.BuildTask(task),
-// 	// 	Msg:    "update success!",
-// 	// }
-// }
+// 更新一条备忘录
+func (service *UpdateTimingTaskService) Update(uid uint, tid string) serializer.Response {
+	var task model.TimingTask
+	if err := model.DB.Where("uid = ? AND id = ?", uid, tid).First(&task).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "task not found!"}
+	}
+
+	task.Title = service.Title
+	task.Content = service.Content
+	task.Status = service.Status
+
+	if err := model.DB.Save(&task).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "update failed!"}
+	}
+	cache.SetTimingTask(task)
+	return serializer.Response{
+		Status: 200,
+		Data:   serializer.BuildTimingTask(task),
+		Msg:    "update success!",
+	}
+}
 
 // // 模糊查询
 // func (service *SearchTimingTaskService) Search(uid uint) serializer.Response {
@@ -167,47 +178,23 @@ func (service *ShowTimingTaskAllService) ShowAll(uid uint) serializer.Response {
 // 	// }
 // }
 
-// // 删除
-// func (service *DeleteTimingTaskService) Delete(tid string) serializer.Response {
-// 	// var task model.TimingTask
-// 	// model.DB.First(&task, tid)
-// 	// err := model.DB.Delete(&task).Error
-// 	// if err != nil {
-// 	// 	return serializer.Response{
-// 	// 		Status: 500,
-// 	// 		Msg:    "Delete Task Failed!",
-// 	// 	}
-// 	// }
-// 	// return serializer.Response{
-// 	// 	Status: 200,
-// 	// 	Msg:    "Delete Task Success!",
-// 	// }
-// }
+// 删除定时任务
+func (service *DeleteTimingTasksService) Delete(uid uint) serializer.Response {
+	if len(service.IDs) == 0 {
+		return serializer.Response{Status: 400, Msg: "请选择要删除的任务"}
+	}
+	if err := model.DB.Where("uid = ? AND id IN (?)", uid, service.IDs).Delete(&model.TimingTask{}).Error; err != nil {
+		return serializer.Response{Status: 500, Msg: "批量删除失败"}
+	}
+	for _, id := range service.IDs {
+		cache.DeleteTimingTask(id)
+	}
+	return serializer.Response{Status: 200, Msg: "批量删除成功"}
+}
 
 // 定时扫描未完成的任务
 // func StartTaskScheduler() {
 // 	ticker := time.NewTicker(30 * time.Second)
-// 	defer ticker.Stop()
-// 	for range ticker.C {
-// 		now := time.Now().UTC()
-// 		var tasks []model.TimingTask
-// 		model.DB.Where(
-// 			"status IN (?) AND DATE_SUB(start_time, INTERVAL early_time SECOND) <= ? AND end_time >= ?",
-// 			[]int{TaskStatusPending, TaskStatusRunning},
-// 			now,
-// 			now,
-// 		).Find(&tasks)
-// 		for _, task := range tasks {
-// 			sendNotification(task) // 调用提醒服务
-// 			fmt.Println(task.Content)
-// 		}
-
-// 		// 标记过期任务
-// 		model.DB.Model(&model.TimingTask{}).
-// 			Where("end_time < ? AND status != ?", now, TaskStatusCompleted).
-// 			Update("status", TaskStatusExpired)
-// 	}
-// }
 
 // Web推送示例（使用SSE）
 // func (s *TaskService) PushUpdates(c *gin.Context) {

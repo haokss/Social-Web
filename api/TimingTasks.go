@@ -13,7 +13,7 @@ func CreateTimingTask(c *gin.Context) {
 	var create_timing_task service.CreateTimingTaskService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
 	if err := c.ShouldBind(&create_timing_task); err == nil {
-		res := create_timing_task.Create(claim.Id)
+		res := create_timing_task.Create(c, claim.Id)
 		c.JSON(200, res)
 	} else {
 		logging.Error(err)
@@ -21,7 +21,7 @@ func CreateTimingTask(c *gin.Context) {
 	}
 }
 
-// 展示用户的备忘录
+// 展示用户定时活动
 func ShowTimingTask(c *gin.Context) {
 	var task service.ShowTaskService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
@@ -34,7 +34,7 @@ func ShowTimingTask(c *gin.Context) {
 	}
 }
 
-// 展示用户所有的备忘录
+// 展示用户所有定时活动
 func ShowTimingTaskAll(c *gin.Context) {
 	var timing_tasks service.ShowTimingTaskAllService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
@@ -49,7 +49,7 @@ func ShowTimingTaskAll(c *gin.Context) {
 
 // 更新一个备忘录
 func UpdateTimingTask(c *gin.Context) {
-	var task service.UpdateTaskService
+	var task service.UpdateTimingTaskService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
 	if err := c.ShouldBind(&task); err == nil {
 		res := task.Update(claim.Id, c.Param("id"))
@@ -74,11 +74,12 @@ func SearchTimingTask(c *gin.Context) {
 }
 
 // 删除备忘录
-func DeleteTimingTask(c *gin.Context) {
-	var delete_task service.DeleteTaskService
-	// claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
-	if err := c.ShouldBind(&delete_task); err == nil {
-		res := delete_task.Delete(c.Param("id"))
+func DeleteTimingTasks(c *gin.Context) {
+	var service service.DeleteTimingTasksService
+	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+
+	if err := c.ShouldBindJSON(&service); err == nil {
+		res := service.Delete(claim.Id)
 		c.JSON(200, res)
 	} else {
 		logging.Error(err)

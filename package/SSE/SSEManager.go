@@ -152,7 +152,7 @@ func (b *Broker) Unregister(userID uint, client *Client) {
 	}
 }
 
-// Notify 立即通知
+// 立即通知接口
 func (b *Broker) Notify(msg Message) {
 	b.muClients.RLock()
 	defer b.muClients.RUnlock()
@@ -182,7 +182,7 @@ func (b *Broker) Notify(msg Message) {
 	}
 }
 
-// ScheduleNotify 定时通知
+// 定时通知接口
 func (b *Broker) ScheduleNotify(msg Message, notifyTime time.Time) {
 	b.muQueue.Lock()
 	defer b.muQueue.Unlock()

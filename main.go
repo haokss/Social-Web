@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"todo_list/cache"
 	"todo_list/config"
 	"todo_list/routes"
 
@@ -10,7 +11,7 @@ import (
 
 func main() {
 
-	// 创建文件
+	// 初始化日志文件
 	file, err := os.OpenFile(".\\log\\app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err == nil {
 		log.SetOutput(file)
@@ -20,6 +21,11 @@ func main() {
 	// 初始化配置
 	config.Init()
 
+	// 加载缓存
+	err = cache.InitTaskCache()
+	if err != nil {
+		log.Fatalf("Failed to init cache: %v", err)
+	}
 	// 初始化路由
 	r := routes.NewRouter()
 

@@ -7,6 +7,8 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -67,4 +69,23 @@ func GenerateMD5Hash(file *multipart.FileHeader) (string, error) {
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func ParseID(s string) uint {
+	id, _ := strconv.ParseUint(s, 10, 32)
+	return uint(id)
+}
+
+func Contains(a, b string) bool {
+	return strings.Contains(strings.ToLower(a), strings.ToLower(b))
+}
+
+func PercentChange(current, previous int) float64 {
+	if previous == 0 {
+		if current > 0 {
+			return 100.0
+		}
+		return 0.0
+	}
+	return (float64(current-previous) / float64(previous)) * 100
 }

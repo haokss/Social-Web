@@ -1,14 +1,18 @@
 package report
 
 import (
-	"fmt"
+	"encoding/csv"
+	"os"
 	"strconv"
 	"strings"
 	"todo_list/model"
 
 	"github.com/xuri/excelize/v2"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
+// 解析微信xlsx账单
 func ParseWeChatXLSX(path string) ([]model.Bill, error) {
 	f, err := excelize.OpenFile(path)
 	if err != nil {
@@ -31,8 +35,9 @@ func ParseWeChatXLSX(path string) ([]model.Bill, error) {
 				data[headers[i]] = strings.TrimSpace(cell)
 			}
 		}
-
-		amount, _ := strconv.ParseFloat(data["金额（元）"], 64)
+		rawAmount := strings.TrimSpace(data["金额(元)"])
+		rawAmount = strings.TrimPrefix(rawAmount, "￥")
+		amount, _ := strconv.ParseFloat(rawAmount, 64)
 		result = append(result, model.Bill{
 			TransactionTime: data["交易时间"],
 			TransactionType: data["交易类型"],
@@ -51,41 +56,69 @@ func ParseWeChatXLSX(path string) ([]model.Bill, error) {
 	return result, nil
 }
 
-func parseAlipayBill(path string) ([]map[string]string, error) {
-	f, err := excelize.OpenFile(path)
+// 解析阿里账单csv格式
+func ParseAlipayCSV(path string) ([]model.Bill, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// 解码 GBK -> UTF-8
+	utf8Reader := transform.NewReader(file, simplifiedchinese.GBK.NewDecoder())
+
+	reader := csv.NewReader(utf8Reader)
+	reader.FieldsPerRecord = -1 // 允许变长行
+
+	rows, err := reader.ReadAll()
 	if err != nil {
 		return nil, err
 	}
 
-	sheet := f.GetSheetName(0)
-	rows, err := f.GetRows(sheet)
-	if err != nil {
-		return nil, err
+	// 找到表头
+	startIndex := 4
+	headers := rows[startIndex]
+	var bills []model.Bill
+
+	// 清理 headers 空格
+	for i := range headers {
+		headers[i] = strings.TrimSpace(headers[i])
 	}
 
-	var result []map[string]string
-	startIndex := 0
-	for i, row := range rows {
-		if len(row) > 0 && strings.Contains(row[0], "交易号") {
-			startIndex = i
+	for _, row := range rows[startIndex+1:] {
+		if len(row) == 0 || row[0] == "" {
+			continue
+		}
+		// 遇到结束标志就停止解析
+		if strings.Contains(row[0], "----------------") {
 			break
 		}
-	}
-
-	if startIndex == 0 {
-		return nil, fmt.Errorf("未找到表头")
-	}
-
-	headers := rows[startIndex]
-	for _, row := range rows[startIndex+1:] {
-		record := map[string]string{}
-		for i, col := range row {
-			if i < len(headers) {
-				record[headers[i]] = strings.TrimSpace(col)
+		data := map[string]string{}
+		for i := range headers {
+			if i < len(row) {
+				data[headers[i]] = strings.TrimSpace(row[i])
 			}
 		}
-		result = append(result, record)
+
+		// 解析金额（可能为负数）
+		amountStr := strings.ReplaceAll(data["金额（元）"], ",", "")
+		amount, _ := strconv.ParseFloat(amountStr, 64)
+
+		bill := model.Bill{
+			TransactionTime: data["付款时间"],
+			TransactionType: data["类型"],
+			Counterparty:    data["交易对方"],
+			Product:         data["商品名称"],
+			IncomeExpense:   data["收/支"],
+			Amount:          amount,
+			PaymentMethod:   "支付宝",
+			Status:          data["交易状态"],
+			TransactionID:   data["交易号"],
+			MerchantID:      data["商家订单号"],
+			Remarks:         data["备注"],
+		}
+		bills = append(bills, bill)
 	}
 
-	return result, nil
+	return bills, nil
 }

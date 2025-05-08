@@ -48,7 +48,7 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 	case "wechat":
 		bills, err = report.ParseWeChatXLSX(tempPath)
 	case "alipay":
-		// bills, err = report.ParseAlipayXLSX(tempPath)
+		bills, err = report.ParseAlipayCSV(tempPath)
 	default:
 		return serializer.Response{Status: 400, Msg: "账单类型错误"}
 	}
@@ -70,7 +70,7 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 		}
 	}()
 
-	// 兼容性插入
+	// 插入
 	successCount := 0
 	for i, bill := range bills {
 		if err := tx.Create(&bill).Error; err != nil {

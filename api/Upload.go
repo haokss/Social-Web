@@ -1,6 +1,7 @@
 package api
 
 import (
+	sse "todo_list/package/SSE"
 	"todo_list/package/utils"
 	"todo_list/service"
 
@@ -12,6 +13,13 @@ import (
 func UploadAva(c *gin.Context) {
 	var upload_ava service.UploadService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
+
+	broker := c.MustGet("sseBroker").(*sse.Broker)
+	broker.Notify(sse.Message{
+		Event: "instant_notification",
+		Data:  map[string]interface{}{"title": "提醒", "content": "Hello"},
+	})
+
 	if err := c.ShouldBind(&upload_ava); err == nil {
 		res := upload_ava.UploadAva(claim.Id)
 		c.JSON(200, res)

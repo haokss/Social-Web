@@ -7,6 +7,9 @@ func migration() {
 		AutoMigrate(&TimingTask{}).
 		AutoMigrate(&Image{}).
 		AutoMigrate(&RelativeInfo{}).
-		AutoMigrate(&Bill{})
+		AutoMigrate(&Bill{}).
+		AutoMigrate(&Colleague{}).
+		AutoMigrate(&Friend{}).
+		AutoMigrate(&Classmate{})
 	DB.Model(&Task{}).AddForeignKey("uid", "User(id)", "CASCADE", "CASCADE")
 }

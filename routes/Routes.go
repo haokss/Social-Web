@@ -22,6 +22,7 @@ func NewRouter() *gin.Engine {
 		MaxAge:           86400, // 预检请求缓存 24 小时
 	}))
 
+	// 初始化sse通知机制
 	broker := sse.NewBroker()
 	defer broker.Shutdown()
 
@@ -61,15 +62,38 @@ func NewRouter() *gin.Engine {
 			authed.POST("timing_task", api.CreateTimingTask)
 			// authed.GET("timing_task/:id", api.ShowTimingTask)
 			authed.POST("timing_tasks", api.ShowTimingTaskAll)
-			// authed.PUT("timing_task/:id", api.UpdateTimingTask)
+			authed.PUT("timing_task/:id", api.UpdateTimingTask)
 			// authed.POST("timing_task/search", api.SearchTimingTask)
-			// authed.DELETE("timing_task/:id", api.DeleteTimingTask)
+			authed.POST("timing_task/delete_batch", api.DeleteTimingTasks)
+
+			// 任务活动统计
+			authed.GET("tasks/stats", api.GetTaskStats)
+			authed.GET("tasks/trend", api.GetTaskTrend)
+			authed.GET("tasks/type-distribution", api.GetTaskTypeDistribution)
 
 			// 亲属关系
 			authed.POST("/relative_info", api.CreateRelative)
 			authed.PUT("/relative_info/:id", api.UpdateRelative)
 			authed.GET("/relative_info", api.GetAllRelatives)
 			authed.DELETE("/relative_info", api.DeleteRelative)
+
+			// 同事关系
+			authed.POST("/colleague", api.CreateColleague)
+			authed.PUT("/colleague/:id", api.UpdateColleague)
+			authed.DELETE("/colleague/batch", api.BatchDeleteColleagues)
+			authed.GET("/colleagues", api.ListTimingTask)
+
+			// 朋友管理
+			authed.POST("/friend", api.CreateFriend)
+			authed.GET("/friend/list", api.ListFriend)
+			authed.PUT("/friend/:id", api.UpdateFriend)
+			authed.DELETE("/friend/batch_delete", api.BatchDeleteFriends)
+			// 同学管理
+			authed.POST("/classmate", api.CreateClassmate)
+			authed.GET("/classmate/list", api.ListClassmate)
+			authed.PUT("/classmate/:id", api.UpdateClassmate)
+			// authed.DELETE("/friends/:id", api.BatchDeleteClassmate) // 单个删除你已有
+			authed.DELETE("/classmate/batch_delete", api.BatchDeleteClassmate)
 
 			// 账单导入GET
 			authed.POST("/import-bill", api.ImportBill)
