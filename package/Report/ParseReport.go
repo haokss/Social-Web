@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"todo_list/model"
 
 	"github.com/xuri/excelize/v2"
@@ -38,14 +39,25 @@ func ParseWeChatXLSX(path string) ([]model.Bill, error) {
 		rawAmount := strings.TrimSpace(data["金额(元)"])
 		rawAmount = strings.TrimPrefix(rawAmount, "￥")
 		amount, _ := strconv.ParseFloat(rawAmount, 64)
+		// 转化导入时间格式
+		layoutInput := "1/2/06 15:04"
+		layoutOutput := "2006-01-02 15:04:05"
+		rawTime := strings.TrimSpace(data["交易时间"])
+		var formattedTime string
+		if parsedTime, err := time.Parse(layoutInput, rawTime); err == nil {
+			formattedTime = parsedTime.Format(layoutOutput)
+		} else {
+			// fmt.Printf("解析时间失败: %v, 原始值: %s\n", err, rawTime)
+			formattedTime = rawTime // 或者直接 continue 跳过该行
+		}
 		result = append(result, model.Bill{
-			TransactionTime: data["交易时间"],
+			TransactionTime: formattedTime,
 			TransactionType: data["交易类型"],
 			Counterparty:    data["交易对方"],
 			Product:         data["商品"],
 			IncomeExpense:   data["收/支"],
 			Amount:          amount,
-			PaymentMethod:   data["支付方式"],
+			PaymentMethod:   "微信支付",
 			Status:          data["当前状态"],
 			TransactionID:   data["交易单号"],
 			MerchantID:      data["商户单号"],
@@ -64,7 +76,7 @@ func ParseAlipayCSV(path string) ([]model.Bill, error) {
 	}
 	defer file.Close()
 
-	// 解码 GBK -> UTF-8
+	// 修改编码方式解码 GBK -> UTF-8
 	utf8Reader := transform.NewReader(file, simplifiedchinese.GBK.NewDecoder())
 
 	reader := csv.NewReader(utf8Reader)

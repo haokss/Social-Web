@@ -39,6 +39,7 @@ func NewRouter() *gin.Engine {
 	store := cookie.NewStore([]byte("something-very-secret"))
 	r.Use(sessions.Sessions("mysession", store))
 
+	// 普通用户接口
 	v1 := r.Group("api/v1")
 	{
 		v1.POST("user/register", api.UserRegister)
@@ -112,6 +113,9 @@ func NewRouter() *gin.Engine {
 			authed.POST("/import-bill", api.ImportBill)
 			authed.GET("/bills", api.GetBillList)
 
+			// 账单统计
+			authed.GET("/bills/stats", api.GetBillStats)
+
 			// sse消息推送
 			authed.GET("/push/notifications", middleware.SSEAuth(), sse.SSEHandler())
 
@@ -121,5 +125,23 @@ func NewRouter() *gin.Engine {
 			authed.GET("/upload/image", api.GetImage)
 		}
 	}
+
+	// 管理员专用接口
+	admin := r.Group("api/v1/admin")
+	admin.Use(middleware.JWT(), middleware.AdminOnly())
+	{
+		admin.GET("/users", api.AdminListUsers)
+		admin.PUT("/user/:id", api.AdminEditUser)
+		admin.POST("/user/reset_password/:id", api.AdminResetPassword)
+
+		admin.GET("task/all_tasks", api.AdminGetAllUserTasks)
+		admin.POST("task/audit/batch", api.AdminBatchAudit)
+
+		admin.POST("timing_task/all_timing_tasks", api.AdminGetAllTimingTasks)
+		admin.POST("timing_task/audit/batch", api.AdminBatchAuditTimingTask)
+
+		admin.GET("upload/image", api.AdminGetAllImages)
+	}
+
 	return r
 }

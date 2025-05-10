@@ -16,6 +16,7 @@ type Task struct {
 	Priority  int    `grom:"default:'5'"` // 任务优先级：0~5
 	IsNotify  int    `gorm:"default:'0'"` // 0未完成，1 已完成
 	NotifyWay int    `gorm:"default:0"`   // 新增：提醒方式（0站内信/1邮件）
+	IsChecked int    `gorm:"default:0"`
 	StartTime int64
 	EndTime   int64
 	gorm.Model
@@ -32,6 +33,7 @@ type TimingTask struct {
 	Type      int       `gorm:"default:'0'"` // 任务类型
 	NotifyWay int       `gorm:"default:0"`   // 新增：提醒方式（0站内信/1邮件/2短信）
 	EarlyTime int       `gorm:"default:0"`   // 提前的时间，秒
+	IsChecked int       `gorm:"default:0"`
 	StartTime time.Time `gorm:"type:datetime"`
 	EndTime   time.Time `gorm:"type:datetime"`
 	gorm.Model

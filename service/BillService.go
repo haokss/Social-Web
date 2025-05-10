@@ -5,12 +5,15 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"todo_list/cache"
 	"todo_list/model"
 	"todo_list/package/report"
 	"todo_list/serializer"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
 
 type ImportBillService struct {
@@ -74,6 +77,7 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 	// 插入
 	successCount := 0
 	for i, bill := range bills {
+		bill.Uid = id
 		if err := tx.Create(&bill).Error; err != nil {
 			tx.Rollback()
 			return serializer.Response{
@@ -92,9 +96,15 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 		}
 	}
 
-	var userBills []model.Bill
-	model.DB.Where("created_by = ?", id).Find(&userBills)
-	cache.SetUserBills(id, userBills)
+	// var userBills []model.Bill
+	// model.DB.Where("uid = ?", id).Find(&userBills)
+
+	// 更新缓存
+	if len(bills) == 0 {
+		log.Warn("查询到 0 条账单记录，不更新缓存")
+	} else {
+		cache.AddUserBills(id, bills)
+	}
 
 	return serializer.Response{
 		Status: 200,
@@ -103,76 +113,57 @@ func (service *ImportBillService) ImportBill(c *gin.Context, id uint) serializer
 }
 
 func (service *ListBillService) GetBillList(id uint) serializer.Response {
-	// // 先查缓存
-	// bills := cache.GetUserBills(id)
-	// if len(bills) > 0 {
-	// 	return serializer.Response{
-	// 		Status: 200,
-	// 		Msg:    "获取成功（缓存）",
-	// 		Data: map[string]interface{}{
-	// 			"list":  bills,
-	// 			"total": len(bills),
-	// 		},
-	// 	}
-	// }
+	// 获取当前用户的账单（全部）
+	bills := cache.GetUserBills(id)
 
-	// // 缓存未命中，查数据库
-	// var dbBills []model.Bill
-	// if err := model.DB.Where("created_by = ?", id).Find(&dbBills).Error; err != nil {
-	// 	return serializer.Response{Status: 500, Msg: "获取账单失败: " + err.Error()}
-	// }
+	// 筛选后的结果
+	var filtered []model.Bill
 
-	// // 存入缓存
-	// cache.SetUserBills(id, dbBills)
-
-	// return serializer.Response{
-	// 	Status: 200,
-	// 	Msg:    "获取成功",
-	// 	Data: map[string]interface{}{
-	// 		"list":  dbBills,
-	// 		"total": len(dbBills),
-	// 	},
-	// }
-	var bills []model.Bill
-	var total int64
-
-	tx := model.DB.Model(&model.Bill{})
-
-	if service.Name != "" {
-		tx = tx.Where("counterparty LIKE ?", "%"+service.Name+"%")
-	}
-	if service.TransactionType != "" {
-		tx = tx.Where("transaction_type = ?", service.TransactionType)
-	}
-	if service.StartDate != "" {
-		tx = tx.Where("transaction_time >= ?", service.StartDate)
-	}
-	if service.EndDate != "" {
-		tx = tx.Where("transaction_time <= ?", service.EndDate)
-	}
-	if service.MinAmount > 0 {
-		tx = tx.Where("amount >= ?", service.MinAmount)
-	}
-	if service.MaxAmount > 0 {
-		tx = tx.Where("amount <= ?", service.MaxAmount)
+	for _, bill := range bills {
+		if service.Name != "" && !strings.Contains(bill.Counterparty, service.Name) {
+			continue
+		}
+		if service.TransactionType != "" && bill.TransactionType != service.TransactionType {
+			continue
+		}
+		if service.StartDate != "" && bill.TransactionTime < service.StartDate {
+			continue
+		}
+		if service.EndDate != "" && bill.TransactionTime > service.EndDate {
+			continue
+		}
+		if service.MinAmount > 0 && bill.Amount < service.MinAmount {
+			continue
+		}
+		if service.MaxAmount > 0 && bill.Amount > service.MaxAmount {
+			continue
+		}
+		filtered = append(filtered, bill)
 	}
 
-	// 统计总数
-	if err := tx.Count(&total).Error; err != nil {
-		return serializer.Response{Status: 500, Msg: "获取记录数失败: " + err.Error()}
-	}
+	total := len(filtered)
+
+	// 按交易时间倒序排序
+	sort.Slice(filtered, func(i, j int) bool {
+		return filtered[i].TransactionTime > filtered[j].TransactionTime
+	})
 
 	// 分页
-	offset := (service.Page - 1) * service.PageSize
-	if err := tx.Offset(offset).Limit(service.PageSize).Order("transaction_time desc").Find(&bills).Error; err != nil {
-		return serializer.Response{Status: 500, Msg: "获取账单列表失败: " + err.Error()}
+	start := (service.Page - 1) * service.PageSize
+	end := start + service.PageSize
+	if start > total {
+		start = total
 	}
+	if end > total {
+		end = total
+	}
+	paged := filtered[start:end]
 
 	return serializer.Response{
 		Status: 200,
 		Msg:    "获取成功",
 		Data: map[string]interface{}{
-			"list":  bills,
+			"list":  paged,
 			"total": total,
 		},
 	}

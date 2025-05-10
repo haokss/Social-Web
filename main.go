@@ -39,6 +39,9 @@ func main() {
 		log.Fatalf("Failed to init cache: %v", err)
 	}
 	cache.InitBillCache()
+	if err := cache.InitBillCache(); err != nil {
+		log.Fatalf("初始化账单缓存失败: %v", err)
+	}
 	// 初始化路由
 	r := routes.NewRouter()
 

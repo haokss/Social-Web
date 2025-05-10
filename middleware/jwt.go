@@ -38,6 +38,24 @@ func JWT() gin.HandlerFunc {
 	}
 }
 
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, exists := c.Get("claims")
+		if !exists {
+			c.JSON(403, gin.H{"code": 403, "msg": "no claims found"})
+			c.Abort()
+			return
+		}
+		userClaims, ok := claims.(*utils.Claims)
+		if !ok || userClaims.Role != "admin" {
+			c.JSON(403, gin.H{"code": 403, "msg": "permission denied"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // SSE认证
 func SSEAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

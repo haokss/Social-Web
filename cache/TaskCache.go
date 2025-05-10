@@ -33,6 +33,17 @@ func GetTask(tid uint) (model.Task, bool) {
 	return task, ok
 }
 
+func GetAllTasks() []model.Task {
+	TaskCacheLock.RLock()
+	defer TaskCacheLock.RUnlock()
+
+	var result []model.Task
+	for _, task := range TaskCache {
+		result = append(result, task)
+	}
+	return result
+}
+
 // SetTask 更新或添加任务到缓存
 func SetTask(task model.Task) {
 	TaskCacheLock.Lock()

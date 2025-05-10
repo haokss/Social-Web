@@ -5,6 +5,7 @@ import (
 	"strings"
 	"todo_list/model"
 	"todo_list/serializer"
+	"todo_list/cache"
 )
 
 // CreatePointService 用于接收和处理点位创建请求的数据
@@ -44,6 +45,14 @@ func (service *CreatePointService) Create(userId uint) serializer.Response {
 			Status: 500,
 			Msg:    "创建点位失败: " + err.Error(),
 		}
+	}
+
+	// 更新亲属缓存
+	for _, id := range service.SelectedPeople {
+		relativeInfo, _:= cache.GetRelative(id)
+		relativeInfo.IsSetMap = 1;
+		relativeInfo.MapUid = point.ID
+		cache.UpdateRelative(relativeInfo)
 	}
 
 	return serializer.Response{
@@ -122,6 +131,14 @@ func (service *ListPointService) Delete(pointID string, userID uint) serializer.
 			Msg:    "删除点位失败: " + err.Error(),
 		}
 	}
+
+	// 更新亲属缓存
+	// for _, id := range service.SelectedPeople {
+	// 	relativeInfo, _:= cache.GetRelative(id)
+	// 	relativeInfo.IsSetMap = 1;
+	// 	relativeInfo.MapUid = point.ID
+	// 	cache.UpdateRelative(relativeInfo)
+	// }
 
 	return serializer.Response{
 		Status: 200,

@@ -9,7 +9,7 @@ import (
 )
 
 type UserService struct {
-	UserName string `form:"user_name" json:"user_name" binding:"required,min=3,max=15"`
+	UserName string `form:"user_name" json:"user_name" binding:"required,min=5,max=15"`
 	Password string `form:"password" json:"password" binding:"required,min=5,max=16"`
 }
 
@@ -76,7 +76,14 @@ func (service *UserService) Login() serializer.Response {
 		}
 	}
 	// 登录成功生成Token
-	token, err := utils.GenerateToken(user.ID, service.UserName, service.Password)
+
+	// 校验用户身份
+	role := "user"
+	if user.Role == 0 {
+		role = "admin"
+	}
+
+	token, err := utils.GenerateToken(user.ID, service.UserName, service.Password, role)
 	if err != nil {
 		return serializer.Response{
 			Status: 500,

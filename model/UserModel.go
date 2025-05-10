@@ -11,6 +11,7 @@ type User struct {
 	Phone          string
 	Email          string
 	AvaUrl         string
+	Role           int `gorm:"default:1"`
 	gorm.Model
 }
 
