@@ -3,8 +3,11 @@ package service
 import (
 	"todo_list/cache"
 	"todo_list/model"
+	sse "todo_list/package/SSE"
 	"todo_list/package/utils"
 	"todo_list/serializer"
+
+	"github.com/gin-gonic/gin"
 )
 
 type CreateTaskService struct {
@@ -47,7 +50,7 @@ type ShowTaskAllService struct {
 }
 
 // 创建一条活动
-func (service *CreateTaskService) Create(id uint) serializer.Response {
+func (service *CreateTaskService) Create(c *gin.Context, id uint) serializer.Response {
 	var user model.User
 	model.DB.First(&user, id)
 	task := model.Task{
@@ -66,6 +69,15 @@ func (service *CreateTaskService) Create(id uint) serializer.Response {
 		return serializer.Response{Status: 500, Msg: "create failed!"}
 	}
 	cache.SetTask(task)
+
+	broker := c.MustGet("sseBroker").(*sse.Broker)
+
+	// 通知管理员审核
+	broker.Notify(sse.Message{
+		Event:     "instant_notification",
+		Data:      map[string]interface{}{"title": "您有新的活动待审核：" + service.Title, "content": service.Content},
+		TargetIDs: []uint{utils.AdminUid},
+	})
 	return serializer.Response{Status: 200, Msg: "create success!"}
 }
 
@@ -81,8 +93,17 @@ func (service *ShowTaskService) Show(uid uint, tid string) serializer.Response {
 // 返回所有的活动
 func (service *ShowTaskAllService) ShowAll(uid uint) serializer.Response {
 	tasks := cache.GetUserTasks(uid)
-	count := len(tasks)
-	return serializer.BuildListResponse(serializer.BuildTasks(tasks), uint(count))
+
+	// 过滤掉审核未通过的任务
+	filtered := make([]model.Task, 0, len(tasks))
+	for _, task := range tasks {
+		if task.IsChecked != 2 {
+			filtered = append(filtered, task)
+		}
+	}
+
+	count := len(filtered)
+	return serializer.BuildListResponse(serializer.BuildTasks(filtered), uint(count))
 }
 
 // 更新一条活动

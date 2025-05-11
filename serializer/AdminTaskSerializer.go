@@ -26,7 +26,7 @@ func AdminBuildTask(task model.Task) AdminTaskSerializer {
 		Status:    task.Status,
 		Uid:       task.Uid,
 		Content:   task.Content,
-		UserName:  task.User.UserName, // 从关联的 User 取用户名
+		UserName:  task.User.UserName,
 		Priority:  task.Priority,
 		IsNotify:  task.IsNotify,
 		NotifyWay: task.NotifyWay,

@@ -118,6 +118,9 @@ func NewRouter() *gin.Engine {
 
 			// sse消息推送
 			authed.GET("/push/notifications", middleware.SSEAuth(), sse.SSEHandler())
+			authed.GET("/notifications", api.ListNotification)
+			authed.POST("/notification/read/:id", api.MarkNotificationRead) // 标记单条消息已读
+			authed.POST("/notifications/read_all", api.MarkAllNotificationsRead)
 
 			// 图片上传
 			authed.POST("/upload/ava", api.UploadAva)
@@ -141,6 +144,7 @@ func NewRouter() *gin.Engine {
 		admin.POST("timing_task/audit/batch", api.AdminBatchAuditTimingTask)
 
 		admin.GET("upload/image", api.AdminGetAllImages)
+		admin.POST("upload/image/audit/batch", api.AdminBatchAuditImages)
 	}
 
 	return r

@@ -27,7 +27,7 @@ func UploadImage(c *gin.Context) {
 	var upload_ava service.UploadService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
 	if err := c.ShouldBind(&upload_ava); err == nil {
-		res := upload_ava.UploadImage(claim.Id)
+		res := upload_ava.UploadImage(c, claim.Id)
 		c.JSON(200, res)
 	} else {
 		logging.Error(err)

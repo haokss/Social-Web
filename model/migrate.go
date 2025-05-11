@@ -11,6 +11,7 @@ func migration() {
 		AutoMigrate(&Colleague{}).
 		AutoMigrate(&Friend{}).
 		AutoMigrate(&Classmate{}).
-		AutoMigrate(&Point{})
+		AutoMigrate(&Point{}).
+		AutoMigrate(&Notification{})
 	DB.Model(&Task{}).AddForeignKey("uid", "User(id)", "CASCADE", "CASCADE")
 }

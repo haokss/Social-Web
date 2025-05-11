@@ -37,6 +37,6 @@ func AdminBatchAudit(c *gin.Context) {
 		return
 	}
 
-	res := service.BatchAudit()
+	res := service.BatchAudit(c)
 	c.JSON(res.Status, res)
 }

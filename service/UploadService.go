@@ -10,9 +10,12 @@ import (
 	"time"
 	"todo_list/config"
 	"todo_list/model"
+	sse "todo_list/package/SSE"
 	"todo_list/package/errorcode"
 	"todo_list/package/utils"
 	"todo_list/serializer"
+
+	"github.com/gin-gonic/gin"
 )
 
 type UploadService struct {
@@ -60,7 +63,7 @@ func (service *UploadService) UploadAva(uid uint) serializer.Response {
 }
 
 // 上传图片处理
-func (service *UploadService) UploadImage(uid uint) serializer.Response {
+func (service *UploadService) UploadImage(c *gin.Context, uid uint) serializer.Response {
 	// 创建存储目录
 	uploadDir := "./www/uploads/Image/" + strconv.Itoa(int(uid))
 	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
@@ -98,6 +101,14 @@ func (service *UploadService) UploadImage(uid uint) serializer.Response {
 			Msg:    "create failed!",
 		}
 	}
+	// 通知管理员审核
+	broker := c.MustGet("sseBroker").(*sse.Broker)
+	broker.Notify(sse.Message{
+		Event:     "instant_notification",
+		Data:      map[string]interface{}{"title": "您有新的图片待审核：" + fileName, "content": fileName},
+		TargetIDs: []uint{utils.AdminUid},
+	})
+
 	return serializer.Response{
 		Status: 200,
 		Data: serializer.UploadAvaSerializer{

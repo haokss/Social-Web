@@ -5,6 +5,7 @@ import (
 	"todo_list/cache"
 	"todo_list/model"
 	sse "todo_list/package/SSE"
+	"todo_list/package/utils"
 	"todo_list/serializer"
 
 	"github.com/gin-gonic/gin"
@@ -85,30 +86,18 @@ func (service *CreateTimingTaskService) Create(c *gin.Context, id uint) serializ
 		TargetIDs: []uint{user.ID},
 	}, notifyTime)
 
+	// 通知管理员审核
+	broker.Notify(sse.Message{
+		Event:     "instant_notification",
+		Data:      map[string]interface{}{"title": "您有新的提醒待审核：" + service.Title, "content": service.Content},
+		TargetIDs: []uint{utils.AdminUid},
+	})
+
 	return serializer.Response{Status: 200, Msg: "create success!"}
 }
 
-// // 展示一条定时任务
-// func (service *ShowTimingTaskService) Show(uid uint, tid string) serializer.Response {
-// 	// var task model.TimingTask
-// 	// code := 200
-// 	// err := model.DB.First(&task, tid).Error
-// 	// if err != nil {
-// 	// 	code = 500
-// 	// 	return serializer.Response{
-// 	// 		Status: code,
-// 	// 		Msg:    "search error!",
-// 	// 	}
-// 	// }
-// 	// return serializer.Response{
-// 	// 	Status: code,
-// 	// 	Data:   serializer.BuildTask(task),
-// 	// 	Msg:    "search success!",
-// 	// }
-// }
-
 // 返回所有定时任务
-func (service *ShowTimingTaskAllService) ShowAll(uid uint) serializer.Response {
+func (service *ShowTimingTaskAllService) ShowAll(c *gin.Context, uid uint) serializer.Response {
 	var tasks []model.TimingTask
 	count := 0
 	if service.PageNum == 0 {
@@ -192,21 +181,21 @@ func (service *DeleteTimingTasksService) Delete(uid uint) serializer.Response {
 	return serializer.Response{Status: 200, Msg: "批量删除成功"}
 }
 
-// 定时扫描未完成的任务
-// func StartTaskScheduler() {
-// 	ticker := time.NewTicker(30 * time.Second)
-
-// Web推送示例（使用SSE）
-// func (s *TaskService) PushUpdates(c *gin.Context) {
-// 	c.Header("Content-Type", "text/event-stream")
-// 	for {
-// 		// 监听任务状态变更事件
-// 		select {
-// 		case event := <-notificationChan:
-// 			c.SSEvent("message", event)
-// 			c.Writer.Flush()
-// 		case <-c.Done():
-// 			return
-// 		}
-// 	}
+// // 展示一条定时任务
+// func (service *ShowTimingTaskService) Show(uid uint, tid string) serializer.Response {
+// 	// var task model.TimingTask
+// 	// code := 200
+// 	// err := model.DB.First(&task, tid).Error
+// 	// if err != nil {
+// 	// 	code = 500
+// 	// 	return serializer.Response{
+// 	// 		Status: code,
+// 	// 		Msg:    "search error!",
+// 	// 	}
+// 	// }
+// 	// return serializer.Response{
+// 	// 	Status: code,
+// 	// 	Data:   serializer.BuildTask(task),
+// 	// 	Msg:    "search success!",
+// 	// }
 // }

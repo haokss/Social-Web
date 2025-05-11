@@ -39,7 +39,7 @@ func ShowTimingTaskAll(c *gin.Context) {
 	var timing_tasks service.ShowTimingTaskAllService
 	claim, _ := utils.ParseToken(c.GetHeader("Authorization"))
 	if err := c.ShouldBind(&timing_tasks); err == nil {
-		res := timing_tasks.ShowAll(claim.Id)
+		res := timing_tasks.ShowAll(c, claim.Id)
 		c.JSON(200, res)
 	} else {
 		logging.Error(err)

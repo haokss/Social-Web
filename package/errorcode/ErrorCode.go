@@ -6,3 +6,7 @@ const (
 	AvaSaveError = 40001 // 头像保存错误
 
 )
+
+const (
+	AdminUid = 3
+)

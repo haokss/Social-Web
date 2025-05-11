@@ -2,18 +2,11 @@ package sse
 
 import (
 	"container/heap"
+	"encoding/json"
 	"sync"
 	"time"
+	"todo_list/model"
 )
-
-// 发送通知 实例结构
-// broker := c.MustGet("sseBroker").(*sse.Broker)
-//
-//	broker.Notify(sse.Message{
-//		Event: "instant_notification",
-//		Data:  map[string]interface{}{"title": "提醒", "content": "Hello"},
-//	})
-//
 
 // Message 消息结构
 type Message struct {
@@ -157,25 +150,50 @@ func (b *Broker) Notify(msg Message) {
 	b.muClients.RLock()
 	defer b.muClients.RUnlock()
 
-	send := func(client *Client) {
+	saveToDB := func(userID uint) {
+		dataBytes, err := json.Marshal(msg.Data)
+		if err != nil {
+			return
+		}
+		notification := model.Notification{
+			UserID:     userID,
+			Event:      msg.Event,
+			Data:       string(dataBytes),
+			ScheduleID: msg.ScheduleID,
+		}
+		_ = model.DB.Create(&notification).Error // 可加日志
+	}
+
+	send := func(userID uint, client *Client) {
 		select {
 		case client.Message <- msg:
 		default:
-			// 防止阻塞，丢弃无法发送的消息
+			// 忽略失败的发送
 		}
 	}
 
-	if len(msg.TargetIDs) == 0 { // 广播
-		for _, clients := range b.clients {
+	if len(msg.TargetIDs) == 0 {
+		// 广播：所有用户都保存 + 推送
+		processed := make(map[uint]bool)
+		for userID, clients := range b.clients {
+			if !processed[userID] {
+				saveToDB(userID)
+				processed[userID] = true
+			}
 			for _, client := range clients {
-				send(client)
+				send(userID, client)
 			}
 		}
-	} else { // 指定用户
+	} else {
+		// 先保存所有目标用户的通知记录
+		for _, userID := range msg.TargetIDs {
+			saveToDB(userID)
+		}
+		// 然后给在线用户发送
 		for _, userID := range msg.TargetIDs {
 			if clients, exists := b.clients[userID]; exists {
 				for _, client := range clients {
-					send(client)
+					send(userID, client)
 				}
 			}
 		}
@@ -198,3 +216,12 @@ func (b *Broker) ScheduleNotify(msg Message, notifyTime time.Time) {
 func (b *Broker) Shutdown() {
 	close(b.shutdownCh)
 }
+
+// 发送通知 实例结构
+// broker := c.MustGet("sseBroker").(*sse.Broker)
+//
+//	broker.Notify(sse.Message{
+//		Event: "instant_notification",
+//		Data:  map[string]interface{}{"title": "提醒", "content": "Hello"},
+//	})
+//

@@ -37,6 +37,6 @@ func AdminBatchAuditTimingTask(c *gin.Context) {
 		return
 	}
 
-	res := service.BatchAuditTimingTask()
+	res := service.BatchAuditTimingTask(c)
 	c.JSON(res.Status, res)
 }
